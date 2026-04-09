@@ -171,7 +171,7 @@ bool WrappedDevice::GetRSMeta(ID3D12RootSignature* pRS, RSMeta& out)
     return true;
 }
 
-HRESULT WrappedDevice::WrapCommandList(REFIID riid, void** ppCmdList)
+HRESULT WrappedDevice::WrapCommandList([[maybe_unused]] REFIID riid, void** ppCmdList)
 {
     // ppCmdList points to a raw ID3D12GraphicsCommandList*; wrap it.
     if (!ppCmdList || !*ppCmdList) return E_POINTER;
@@ -438,6 +438,18 @@ HRESULT WrappedDevice::CreateMetaCommand(REFGUID g, UINT nm, const void* pc, SIZ
     ID3D12Device5* p5 = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p5));
     HRESULT hr = p5 ? p5->CreateMetaCommand(g,nm,pc,ps,r,p) : E_NOINTERFACE;
     if (p5) p5->Release(); return hr;
+}
+void WrappedDevice::BuildRaytracingAccelerationStructure(ID3D12GraphicsCommandList4* cl, const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC* d, UINT ni, const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC* i) {
+    ID3D12Device5* p5 = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p5));
+    if (p5) { p5->BuildRaytracingAccelerationStructure(cl,d,ni,i); p5->Release(); }
+}
+void WrappedDevice::EmitRaytracingAccelerationStructurePostbuildInfo(ID3D12GraphicsCommandList4* cl, const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC* d, UINT n, const D3D12_GPU_VIRTUAL_ADDRESS* a) {
+    ID3D12Device5* p5 = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p5));
+    if (p5) { p5->EmitRaytracingAccelerationStructurePostbuildInfo(cl,d,n,a); p5->Release(); }
+}
+void WrappedDevice::CopyRaytracingAccelerationStructure(ID3D12GraphicsCommandList4* cl, D3D12_GPU_VIRTUAL_ADDRESS d, D3D12_GPU_VIRTUAL_ADDRESS s, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE m) {
+    ID3D12Device5* p5 = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p5));
+    if (p5) { p5->CopyRaytracingAccelerationStructure(cl,d,s,m); p5->Release(); }
 }
 HRESULT WrappedDevice::CreateStateObject(const D3D12_STATE_OBJECT_DESC* d, REFIID r, void** p) {
     ID3D12Device5* p5 = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p5));

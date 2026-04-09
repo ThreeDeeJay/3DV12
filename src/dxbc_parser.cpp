@@ -378,16 +378,6 @@ bool InjectCBDecl(std::vector<uint32_t>& tokens, uint32_t cbSlot,
     return true;
 }
 
-// Build operand token0 for a temp register rN with mask (dest) or swizzle (src).
-// reg is intentionally unused here – the register index is emitted as a separate
-// DWORD by the caller; this function only builds the OperandToken0 descriptor.
-static uint32_t TempOp([[maybe_unused]] uint32_t reg,
-                        D3D10_SB_OPERAND_SELECTION_MODE sel,
-                        uint32_t maskOrSwizzle)
-{
-    return MakeOperandToken0_Register(OPT_TEMP, sel, maskOrSwizzle, IDX_1D, false);
-}
-
 // Build source operand for cb<slot>[0].y with negate modifier (-cb)
 // Returns 4 tokens: [modOperandToken0, extModToken, regIdx, elemIdx]
 static std::vector<uint32_t> CbSourceNeg(uint32_t cbSlot, uint32_t component /*0=x,1=y,2=z,3=w*/)
