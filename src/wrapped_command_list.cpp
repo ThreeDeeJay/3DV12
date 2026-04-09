@@ -192,11 +192,11 @@ void WrappedCommandList::ExecuteIndirect(ID3D12CommandSignature* s,UINT mc,ID3D1
 // ---------------------------------------------------------------------------
 // ID3D12GraphicsCommandList1 stubs
 // ---------------------------------------------------------------------------
-void WrappedCommandList::AtomicCopyBufferUINT(ID3D12Resource* d,UINT64 do_,ID3D12Resource* s,UINT64 so,UINT n,ID3D12Resource* const* dd,const D3D12_SUBRESOURCE_DATA* sd) {
+void WrappedCommandList::AtomicCopyBufferUINT(ID3D12Resource* d,UINT64 do_,ID3D12Resource* s,UINT64 so,UINT n,ID3D12Resource* const* dd,const D3D12_SUBRESOURCE_RANGE_UINT64* sd) {
     ID3D12GraphicsCommandList1* p = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p));
     if (p) { p->AtomicCopyBufferUINT(d,do_,s,so,n,dd,sd); p->Release(); }
 }
-void WrappedCommandList::AtomicCopyBufferUINT64(ID3D12Resource* d,UINT64 do_,ID3D12Resource* s,UINT64 so,UINT n,ID3D12Resource* const* dd,const D3D12_SUBRESOURCE_DATA* sd) {
+void WrappedCommandList::AtomicCopyBufferUINT64(ID3D12Resource* d,UINT64 do_,ID3D12Resource* s,UINT64 so,UINT n,ID3D12Resource* const* dd,const D3D12_SUBRESOURCE_RANGE_UINT64* sd) {
     ID3D12GraphicsCommandList1* p = nullptr; m_pReal->QueryInterface(IID_PPV_ARGS(&p));
     if (p) { p->AtomicCopyBufferUINT64(d,do_,s,so,n,dd,sd); p->Release(); }
 }

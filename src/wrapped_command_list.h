@@ -98,8 +98,8 @@ public:
     void STDMETHODCALLTYPE ExecuteIndirect(ID3D12CommandSignature*,UINT,ID3D12Resource*,UINT64,ID3D12Resource*,UINT64) override;
 
     // ID3D12GraphicsCommandList1
-    void STDMETHODCALLTYPE AtomicCopyBufferUINT(ID3D12Resource*,UINT64,ID3D12Resource*,UINT64,UINT,ID3D12Resource* const*,const D3D12_SUBRESOURCE_DATA*) override;
-    void STDMETHODCALLTYPE AtomicCopyBufferUINT64(ID3D12Resource*,UINT64,ID3D12Resource*,UINT64,UINT,ID3D12Resource* const*,const D3D12_SUBRESOURCE_DATA*) override;
+    void STDMETHODCALLTYPE AtomicCopyBufferUINT(ID3D12Resource*,UINT64,ID3D12Resource*,UINT64,UINT,ID3D12Resource* const*,const D3D12_SUBRESOURCE_RANGE_UINT64*) override;
+    void STDMETHODCALLTYPE AtomicCopyBufferUINT64(ID3D12Resource*,UINT64,ID3D12Resource*,UINT64,UINT,ID3D12Resource* const*,const D3D12_SUBRESOURCE_RANGE_UINT64*) override;
     void STDMETHODCALLTYPE OMSetDepthBounds(FLOAT,FLOAT) override;
     void STDMETHODCALLTYPE SetSamplePositions(UINT,UINT,D3D12_SAMPLE_POSITION*) override;
     void STDMETHODCALLTYPE ResolveSubresourceRegion(ID3D12Resource*,UINT,UINT,UINT,ID3D12Resource*,UINT,D3D12_RECT*,DXGI_FORMAT,D3D12_RESOLVE_MODE) override;

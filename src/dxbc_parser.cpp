@@ -328,7 +328,7 @@ std::vector<uint8_t> PayloadFromTokens(const std::vector<uint32_t>& tokens)
 static size_t FindEndOfDecls(const std::vector<uint32_t>& tokens)
 {
     size_t last = 2; // start after ProgramToken and length token
-    uint32_t tokenCount = tokens.size();
+    size_t tokenCount = tokens.size();
     for (uint32_t pc = 2; pc < tokenCount; ) {
         uint32_t tok0   = tokens[pc];
         uint32_t opcode = tok0 & 0x7FFu;
@@ -343,7 +343,8 @@ static size_t FindEndOfDecls(const std::vector<uint32_t>& tokens)
     return last;
 }
 
-bool InjectCBDecl(std::vector<uint32_t>& tokens, uint32_t cbSlot, uint32_t& inOutTempCount)
+bool InjectCBDecl(std::vector<uint32_t>& tokens, uint32_t cbSlot,
+                  [[maybe_unused]] uint32_t& inOutTempCount)
 {
     // Instruction: dcl_constantbuffer cb<cbSlot>[1], immediateIndexed
     //
@@ -377,8 +378,11 @@ bool InjectCBDecl(std::vector<uint32_t>& tokens, uint32_t cbSlot, uint32_t& inOu
     return true;
 }
 
-// Build operand for a temp register rN with mask (dest) or swizzle (src)
-static uint32_t TempOp(uint32_t reg, D3D10_SB_OPERAND_SELECTION_MODE sel,
+// Build operand token0 for a temp register rN with mask (dest) or swizzle (src).
+// reg is intentionally unused here – the register index is emitted as a separate
+// DWORD by the caller; this function only builds the OperandToken0 descriptor.
+static uint32_t TempOp([[maybe_unused]] uint32_t reg,
+                        D3D10_SB_OPERAND_SELECTION_MODE sel,
                         uint32_t maskOrSwizzle)
 {
     return MakeOperandToken0_Register(OPT_TEMP, sel, maskOrSwizzle, IDX_1D, false);
@@ -388,14 +392,10 @@ static uint32_t TempOp(uint32_t reg, D3D10_SB_OPERAND_SELECTION_MODE sel,
 // Returns 4 tokens: [modOperandToken0, extModToken, regIdx, elemIdx]
 static std::vector<uint32_t> CbSourceNeg(uint32_t cbSlot, uint32_t component /*0=x,1=y,2=z,3=w*/)
 {
-    // OperandToken0 with extended=1 (negate modifier following)
-    // Selection = SELECT1, component bits in [11:10]
-    uint32_t compBits = (component & 3u) << 6u; // bits [11:4]: for SELECT1 mode, component in [7:6]
-    // Actually for SELECT_1 mode bits [5:4] are the component:
-    // bits [11:4] in OperandToken0: bits [5:4] = component index for SELECT_1
-    // So: compBits = component << 4 (relative to bit 4, so actual shift is bit4+shift_for_sel1)
-    // From spec: SELECT_1 mode: component = bits [5:4] of the operand token (within the 8-bit field at bits [11:4])
-    uint32_t compField = (component & 3u) << 0u; // low 2 bits of the 8-bit field
+    // OperandToken0 with extended=1 (negate modifier following).
+    // SELECT_1 mode: component index sits in bits [5:4] of the 8-bit field at
+    // OperandToken0[11:4], i.e. the low 2 bits of that field (bits [5:4] of the token).
+    uint32_t compField = (component & 3u); // low 2 bits of the 8-bit field at [11:4]
     uint32_t opTok = 0;
     opTok |= (2u << 0);       // 4-component
     opTok |= (2u << 2);       // SELECT_1 mode
@@ -472,6 +472,9 @@ static void Append(std::vector<uint32_t>& dst, const std::vector<uint32_t>& src)
 {
     dst.insert(dst.end(), src.begin(), src.end());
 }
+
+// Sentinel used in place of SIZE_MAX for clarity
+static constexpr size_t npos_value = SIZE_MAX;
 
 bool InjectVSPositionCorrection(std::vector<uint32_t>& tokens,
                                 uint32_t posOutputIndex,
@@ -580,8 +583,6 @@ uint32_t InjectEyeIndexLoad(std::vector<uint32_t>& tokens,
     }
     return scratchReg;
 }
-
-static constexpr size_t npos_value = SIZE_MAX;
 
 DXBCBlob PatchBlob(const DXBCBlob& src, uint32_t cbSlot)
 {

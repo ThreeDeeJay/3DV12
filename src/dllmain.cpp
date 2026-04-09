@@ -11,7 +11,9 @@
 //   The real d3d12.dll must be accessible (system32 is fine; Windows loader
 //   will find it after we've already been loaded from the app directory).
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
 #include <d3d12.h>
 #include <string>
