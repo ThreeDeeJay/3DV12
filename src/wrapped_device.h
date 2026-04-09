@@ -6,39 +6,45 @@
 #include <atomic>
 #include <mutex>
 #include <unordered_map>
-#include <vector>
 
-// Forward declaration
 class WrappedCommandList;
 
 // ---------------------------------------------------------------------------
-// WrappedDevice wraps ID3D12Device (base interface).
-// Higher-versioned interfaces (Device1..Device9) are forwarded via QI to the
-// real device, then re-wrapped on the fly.  The critical overrides are:
-//   • CreateGraphicsPipelineState  – patch VS/PS shaders
-//   • CreateComputePipelineState   – patch CS shaders
-//   • CreateRootSignature          – append stereo CBV parameter
-//   • CreateCommandList / 1        – return WrappedCommandList
-//   • CreateCommandQueue           – pass-through (no wrapping needed)
+// WrappedDevice inherits only from ID3D12Device (the base, version 0).
+//
+// This sidesteps the SDK-version vtable fragility of Device1..Device5: the
+// pure-virtual lists differ across Windows SDK releases (Build/Emit/Copy
+// RaytracingAccelerationStructure appear on Device5 in some SDKs and on the
+// command list in others).
+//
+// All interception targets live on the stable base interface:
+//   CreateGraphicsPipelineState  – patch VS/PS shaders
+//   CreateComputePipelineState   – patch CS shaders
+//   CreateRootSignature          – append stereo CBV parameter
+//   CreateCommandList            – return WrappedCommandList
+//
+// QueryInterface:
+//   IUnknown / ID3D12Object / ID3D12Device  → this (our wrapper)
+//   ID3D12Device1 … ID3D12DeviceN           → m_pReal (addref'd, pass-through)
 // ---------------------------------------------------------------------------
-class WrappedDevice : public ID3D12Device5
+class WrappedDevice : public ID3D12Device
 {
 public:
-    WrappedDevice(ID3D12Device* pReal);
+    explicit WrappedDevice(ID3D12Device* pReal);
     virtual ~WrappedDevice();
 
-    // ----- IUnknown -----
+    // IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObj) override;
     ULONG   STDMETHODCALLTYPE AddRef()  override;
     ULONG   STDMETHODCALLTYPE Release() override;
 
-    // ----- ID3D12Object -----
-    HRESULT STDMETHODCALLTYPE GetPrivateData(REFGUID guid, UINT* pDataSize, void* pData) override;
-    HRESULT STDMETHODCALLTYPE SetPrivateData(REFGUID guid, UINT DataSize, const void* pData) override;
-    HRESULT STDMETHODCALLTYPE SetPrivateDataInterface(REFGUID guid, const IUnknown* pData) override;
-    HRESULT STDMETHODCALLTYPE SetName(LPCWSTR Name) override;
+    // ID3D12Object
+    HRESULT STDMETHODCALLTYPE GetPrivateData(REFGUID, UINT*, void*) override;
+    HRESULT STDMETHODCALLTYPE SetPrivateData(REFGUID, UINT, const void*) override;
+    HRESULT STDMETHODCALLTYPE SetPrivateDataInterface(REFGUID, const IUnknown*) override;
+    HRESULT STDMETHODCALLTYPE SetName(LPCWSTR) override;
 
-    // ----- ID3D12Device -----
+    // ID3D12Device – all 37 pure virtuals
     UINT    STDMETHODCALLTYPE GetNodeCount() override;
     HRESULT STDMETHODCALLTYPE CreateCommandQueue(const D3D12_COMMAND_QUEUE_DESC*, REFIID, void**) override;
     HRESULT STDMETHODCALLTYPE CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE, REFIID, void**) override;
@@ -77,68 +83,25 @@ public:
     void    STDMETHODCALLTYPE GetResourceTiling(ID3D12Resource*, UINT*, D3D12_PACKED_MIP_INFO*, D3D12_TILE_SHAPE*, UINT*, UINT, D3D12_SUBRESOURCE_TILING*) override;
     LUID    STDMETHODCALLTYPE GetAdapterLuid() override;
 
-    // ----- ID3D12Device1 -----
-    HRESULT STDMETHODCALLTYPE CreatePipelineLibrary(const void*, SIZE_T, REFIID, void**) override;
-    HRESULT STDMETHODCALLTYPE SetEventOnMultipleFenceCompletion(ID3D12Fence* const*, const UINT64*, UINT, D3D12_MULTIPLE_FENCE_WAIT_FLAGS, HANDLE) override;
-    HRESULT STDMETHODCALLTYPE SetResidencyPriority(UINT, ID3D12Pageable* const*, const D3D12_RESIDENCY_PRIORITY*) override;
-
-    // ----- ID3D12Device2 -----
-    HRESULT STDMETHODCALLTYPE CreatePipelineState(const D3D12_PIPELINE_STATE_STREAM_DESC*, REFIID, void**) override;
-
-    // ----- ID3D12Device3 -----
-    HRESULT STDMETHODCALLTYPE OpenExistingHeapFromAddress(const void*, REFIID, void**) override;
-    HRESULT STDMETHODCALLTYPE OpenExistingHeapFromFileMapping(HANDLE, REFIID, void**) override;
-    HRESULT STDMETHODCALLTYPE EnqueueMakeResident(D3D12_RESIDENCY_FLAGS, UINT, ID3D12Pageable* const*, ID3D12Fence*, UINT64) override;
-
-    // ----- ID3D12Device4 -----
-    HRESULT STDMETHODCALLTYPE CreateCommandList1(UINT, D3D12_COMMAND_LIST_TYPE, D3D12_COMMAND_LIST_FLAGS, REFIID, void**) override;
-    HRESULT STDMETHODCALLTYPE CreateProtectedResourceSession(const D3D12_PROTECTED_RESOURCE_SESSION_DESC*, REFIID, void**) override;
-    HRESULT STDMETHODCALLTYPE CreateHeap1(const D3D12_HEAP_DESC*, ID3D12ProtectedResourceSession*, REFIID, void**) override;
-    HRESULT STDMETHODCALLTYPE CreateReservedResource1(const D3D12_RESOURCE_DESC*, D3D12_RESOURCE_STATES, const D3D12_CLEAR_VALUE*, ID3D12ProtectedResourceSession*, REFIID, void**) override;
-    D3D12_RESOURCE_ALLOCATION_INFO STDMETHODCALLTYPE GetResourceAllocationInfo1(UINT, UINT, const D3D12_RESOURCE_DESC*, D3D12_RESOURCE_ALLOCATION_INFO1*) override;
-
-    // ----- ID3D12Device5 -----
-    HRESULT STDMETHODCALLTYPE CreateLifetimeTracker(ID3D12LifetimeOwner*, REFIID, void**) override;
-    void    STDMETHODCALLTYPE RemoveDevice() override;
-    HRESULT STDMETHODCALLTYPE EnumerateMetaCommands(UINT*, D3D12_META_COMMAND_DESC*) override;
-    HRESULT STDMETHODCALLTYPE EnumerateMetaCommandParameters(REFGUID, D3D12_META_COMMAND_PARAMETER_STAGE, UINT*, UINT*, D3D12_META_COMMAND_PARAMETER_DESC*) override;
-    HRESULT STDMETHODCALLTYPE CreateMetaCommand(REFGUID, UINT, const void*, SIZE_T, REFIID, void**) override;
-    void    STDMETHODCALLTYPE BuildRaytracingAccelerationStructure(ID3D12GraphicsCommandList4*, const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC*, UINT, const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC*) override;
-    void    STDMETHODCALLTYPE EmitRaytracingAccelerationStructurePostbuildInfo(ID3D12GraphicsCommandList4*, const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC*, UINT, const D3D12_GPU_VIRTUAL_ADDRESS*) override;
-    void    STDMETHODCALLTYPE CopyRaytracingAccelerationStructure(ID3D12GraphicsCommandList4*, D3D12_GPU_VIRTUAL_ADDRESS, D3D12_GPU_VIRTUAL_ADDRESS, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE) override;
-    HRESULT STDMETHODCALLTYPE CreateStateObject(const D3D12_STATE_OBJECT_DESC*, REFIID, void**) override;
-    void    STDMETHODCALLTYPE GetRaytracingAccelerationStructurePrebuildInfo(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS*, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO*) override;
-    D3D12_DRIVER_MATCHING_IDENTIFIER_STATUS STDMETHODCALLTYPE CheckDriverMatchingIdentifier(D3D12_SERIALIZED_DATA_TYPE, const D3D12_SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER*) override;
-
-    // ----- Accessors -----
-    ID3D12Device* GetReal() const { return m_pReal; }
-
-    // Stereo param GPU buffer: one per frame-in-flight for safe upload
+    // Accessors used by WrappedCommandList
+    ID3D12Device*   GetReal()             const { return m_pReal; }
     ID3D12Resource* GetStereoParamBuffer();
-    void UpdateStereoParamBuffer(struct StereoParams* pParams);
+    void            UpdateStereoParamBuffer(struct StereoParams* pParams);
 
-    // Root signature metadata (how many parameters the original RS had)
-    struct RSMeta {
-        UINT origParamCount = 0;
-        UINT stereoParamIdx = 0; // index of the appended stereo CBV
-    };
+    struct RSMeta { UINT origParamCount = 0; UINT stereoParamIdx = 0; };
     bool GetRSMeta(ID3D12RootSignature* pRS, RSMeta& out);
 
 private:
-    ID3D12Device*        m_pReal;
-    std::atomic<ULONG>   m_refCount;
+    ID3D12Device*      m_pReal;
+    std::atomic<ULONG> m_refCount;
 
-    // Stereo constant buffer
-    ID3D12Resource*       m_pStereoParamBuf  = nullptr;
-    void*                 m_pStereoMapped    = nullptr;
+    ID3D12Resource*    m_pStereoParamBuf = nullptr;
+    void*              m_pStereoMapped   = nullptr;
 
-    // RS metadata map
-    std::mutex            m_rsMtx;
+    std::mutex         m_rsMtx;
     std::unordered_map<ID3D12RootSignature*, RSMeta> m_rsMeta;
 
-    void TrackRSMeta(ID3D12RootSignature* pRS, const RSMeta& m);
+    void    TrackRSMeta(ID3D12RootSignature* pRS, const RSMeta& m);
     HRESULT CreateStereoParamBuffer();
-
-    // Helper: wrap a raw command list pointer in a WrappedCommandList
-    HRESULT WrapCommandList(REFIID riid, void** ppCmdList);
+    HRESULT WrapCommandList(void** ppCmdList);
 };
