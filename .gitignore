@@ -1,0 +1,56 @@
+# 3DV12 .gitignore
+
+# Build output directories
+build*/
+Release/
+*.ilk
+*.exp
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+
+# Compiled binaries
+*.dll
+*.pdb
+*.lib
+*.exe
+*.obj
+*.o
+
+# But do track the default INI and documentation
+!3DV12.ini.default
+!LICENSE
+!README.md
+
+# Visual Studio / Rider / CLion
+.vs/
+*.suo
+*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+out/
+.idea/
+cmake-build-*/
+
+# ShaderDump (runtime debug output)
+ShaderDump/
+
+# Log files produced at runtime
+*.log
+
+# Archives
+*.zip
+*.tar.gz
+*.7z
+
+# Windows thumbnails
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store

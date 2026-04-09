@@ -1,0 +1,43 @@
+; 3DV12 – D3D12 Stereoscopic Shader-Patching Wrapper
+; Place this file renamed to "3DV12.ini" next to d3d12.dll (the proxy).
+; All values shown are defaults.
+
+[General]
+; Log file path – relative to d3d12.dll or absolute.
+LogFile  = 3DV12.log
+; Verbosity: Off | Error | Warn | Info | Debug | Trace
+LogLevel = Info
+
+[Stereo]
+; Master enable switch.
+Enabled              = true
+
+; Scale factors applied on top of NVAPI's own values.
+; 1.0 = unchanged.  Increase to widen eye separation.
+SeparationScale      = 1.0
+ConvergenceScale     = 1.0
+
+; Heuristic auto-detection of deferred/post-process passes.
+; Disable to restrict patching to VS position correction only.
+AutoDetect           = true
+
+; Choose which shader stages to patch.
+PatchVertexShaders   = true
+PatchPixelShaders    = true
+PatchComputeShaders  = true
+
+; HLSL constant buffer register for stereo params (b<N>, space 13).
+; Must match the register used in your stereo HLSL snippet if overriding.
+StereoConstantBuffer = 13
+
+; Root signature slot index for the stereo CBV.
+; -1 = auto-append (recommended).
+StereoRootParamIndex = -1
+
+[Debug]
+; Dump raw (pre-patch) and patched shader bytecode to DumpDir.
+; Useful for offline inspection with 3DMigoto's shader tools.
+DumpShaders  = false
+DumpDir      = ShaderDump
+; Print FNV-1a shader hash to the log for each analysed shader.
+LogShaderHash = true

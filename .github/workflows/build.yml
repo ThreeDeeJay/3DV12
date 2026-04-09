@@ -1,0 +1,150 @@
+name: Build 3DV12
+
+on:
+  push:
+    branches: [ "main", "master", "dev" ]
+    tags:     [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE_RELEASE: Release
+  BUILD_TYPE_DEBUG:   Debug
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # x64 Release + Debug
+  # ──────────────────────────────────────────────────────────────
+  build-x64:
+    name: "MSVC x64 (${{ matrix.config }})"
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [Release, Debug]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        # Explicitly include .github so the directory isn't silently skipped
+        # by any glob expansion rules in upload steps below.
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake (x64, ${{ matrix.config }})
+        run: |
+          cmake -B build-x64-${{ matrix.config }} `
+                -A x64 `
+                -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+
+      - name: Build (x64, ${{ matrix.config }})
+        run: |
+          cmake --build build-x64-${{ matrix.config }} `
+                --config ${{ matrix.config }} `
+                --parallel
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          $outDir = "artifacts\x64-${{ matrix.config }}"
+          New-Item -ItemType Directory -Force $outDir | Out-Null
+          Copy-Item "build-x64-${{ matrix.config }}\${{ matrix.config }}\d3d12.dll" $outDir -ErrorAction SilentlyContinue
+          Copy-Item "build-x64-${{ matrix.config }}\${{ matrix.config }}\d3d12.pdb" $outDir -ErrorAction SilentlyContinue
+          Copy-Item "3DV12.ini.default"  $outDir -ErrorAction SilentlyContinue
+          Copy-Item "LICENSE"             $outDir -ErrorAction SilentlyContinue
+
+      - name: Upload artifacts (x64-${{ matrix.config }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3DV12-x64-${{ matrix.config }}
+          path: artifacts/x64-${{ matrix.config }}/
+          if-no-files-found: warn
+
+  # ──────────────────────────────────────────────────────────────
+  # x86 Release + Debug
+  # ──────────────────────────────────────────────────────────────
+  build-x86:
+    name: "MSVC x86 (${{ matrix.config }})"
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [Release, Debug]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSVC (x86)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+
+      - name: Configure CMake (x86, ${{ matrix.config }})
+        run: |
+          cmake -B build-x86-${{ matrix.config }} `
+                -A Win32 `
+                -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+
+      - name: Build (x86, ${{ matrix.config }})
+        run: |
+          cmake --build build-x86-${{ matrix.config }} `
+                --config ${{ matrix.config }} `
+                --parallel
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          $outDir = "artifacts\x86-${{ matrix.config }}"
+          New-Item -ItemType Directory -Force $outDir | Out-Null
+          Copy-Item "build-x86-${{ matrix.config }}\${{ matrix.config }}\d3d12.dll" $outDir -ErrorAction SilentlyContinue
+          Copy-Item "build-x86-${{ matrix.config }}\${{ matrix.config }}\d3d12.pdb" $outDir -ErrorAction SilentlyContinue
+          Copy-Item "3DV12.ini.default"  $outDir -ErrorAction SilentlyContinue
+          Copy-Item "LICENSE"             $outDir -ErrorAction SilentlyContinue
+
+      - name: Upload artifacts (x86-${{ matrix.config }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3DV12-x86-${{ matrix.config }}
+          path: artifacts/x86-${{ matrix.config }}/
+          if-no-files-found: warn
+
+  # ──────────────────────────────────────────────────────────────
+  # Release packaging (on tags only)
+  # ──────────────────────────────────────────────────────────────
+  package-release:
+    name: Package GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-x64, build-x86]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-staging/
+
+      - name: Create release ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path release-staging\* `
+                           -DestinationPath "3DV12-${{ github.ref_name }}.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "3DV12-${{ github.ref_name }}.zip"
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
