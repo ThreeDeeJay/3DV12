@@ -113,7 +113,9 @@ bool Load(const std::string& iniPath, Config& out)
     // [Debug]
     out.dumpShaders   = ToBool (GET("Debug", "DumpShaders",   "false"), false);
     out.dumpDir       =         GET("Debug", "DumpDir",        "ShaderDump");
-    out.logShaderHash = ToBool (GET("Debug", "LogShaderHash",  "true"),  true);
+    out.logShaderHash    = ToBool (GET("Debug", "LogShaderHash",  "true"),  true);
+    out.enableDebugLayer = ToBool (GET("Debug", "EnableDebugLayer","false"), false);
+    out.drainInfoQueue   = ToBool (GET("Debug", "DrainInfoQueue",  "true"),  true);
 
     LOG_INFO("Config loaded from '%s'.", iniPath.c_str());
     return true;
@@ -150,7 +152,11 @@ StereoRootParamIndex = -1
 ; Dump unpatched + patched shader bytecode to DumpDir
 DumpShaders  = false
 DumpDir      = ShaderDump
-LogShaderHash = true
+LogShaderHash    = true
+; Enable D3D12 SDK debug layer (requires debug DLLs installed)
+EnableDebugLayer = false
+; Drain ID3D12InfoQueue messages into the 3DV12 log
+DrainInfoQueue   = true
 )";
     return true;
 }
