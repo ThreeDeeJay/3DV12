@@ -6,7 +6,7 @@
 ; Log file path – relative to d3d12.dll or absolute.
 LogFile  = 3DV12.log
 ; Verbosity: Off | Error | Warn | Info | Debug | Trace
-LogLevel = Info
+LogLevel = Debug
 
 [Stereo]
 ; Master enable switch.
