@@ -5,8 +5,8 @@ env:
   GH_TOKEN: ${{github.token}}
   Branch: ${{github.ref_name}}
   Artifacts: build/Release
+  Extension: *.dll # *
   Title: ${{github.event.repository.name}}
-  Executable: ${{github.event.repository.name}}.exe # *
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{env.Title}}-${{matrix.Settings.Name}}-${{matrix.Configuration}}
-        path: "${{github.workspace}}/${{env.Artifacts}}/"
+        path: "${{github.workspace}}/${{env.Artifacts}}/${{env.Extension}}"
 
   Release:
     name: Release
