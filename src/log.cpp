@@ -8,23 +8,10 @@
 #include <cstdarg>
 #include <mutex>
 #include <string>
-#include <ctime>
 
-static FILE*     g_File  = nullptr;
-static LogLevel  g_Level = LogLevel::Info;
+static FILE*      g_File  = nullptr;
+static LogLevel   g_Level = LogLevel::Info;
 static std::mutex g_Mtx;
-
-// ---------------------------------------------------------------------------
-// Thread-safe timestamp string helper
-// ---------------------------------------------------------------------------
-static void GetTimestamp(char* buf, size_t n)
-{
-    SYSTEMTIME st;
-    GetLocalTime(&st);
-    snprintf(buf, n, "%04u-%02u-%02u %02u:%02u:%02u.%03u",
-             st.wYear, st.wMonth,  st.wDay,
-             st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-}
 
 static const char* LevelTag(LogLevel l)
 {
@@ -38,7 +25,6 @@ static const char* LevelTag(LogLevel l)
     }
 }
 
-// ---------------------------------------------------------------------------
 namespace Log {
 
 void Init(const std::string& filePath, LogLevel level)
@@ -46,18 +32,15 @@ void Init(const std::string& filePath, LogLevel level)
     std::lock_guard<std::mutex> lk(g_Mtx);
     g_Level = level;
 
-    if (!filePath.empty()) {
+    if (!filePath.empty())
         fopen_s(&g_File, filePath.c_str(), "a");
-    }
     if (!g_File) g_File = stderr;
 
-    char ts[32];
-    GetTimestamp(ts, sizeof(ts));
     fprintf(g_File,
             "========================================\n"
-            "[%s] " PROJECT_FULL " – version int %d\n"
+            PROJECT_FULL " – version int %d\n"
             "========================================\n",
-            ts, VERSION);
+            VERSION);
     fflush(g_File);
 }
 
@@ -65,7 +48,7 @@ void Shutdown()
 {
     std::lock_guard<std::mutex> lk(g_Mtx);
     if (g_File && g_File != stderr) {
-        fprintf(g_File, "[Log] Shutdown.\n");
+        fprintf(g_File, "[INF] Log shutdown.\n");
         fclose(g_File);
     }
     g_File = nullptr;
@@ -81,12 +64,9 @@ void Write(LogLevel level, const char* fmt, ...)
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
-    char ts[32];
-    GetTimestamp(ts, sizeof(ts));
-
     std::lock_guard<std::mutex> lk(g_Mtx);
     if (!g_File) return;
-    fprintf(g_File, "[%s][%s] %s\n", ts, LevelTag(level), msg);
+    fprintf(g_File, "[%s] %s\n", LevelTag(level), msg);
     fflush(g_File);
 }
 
@@ -97,7 +77,7 @@ LogLevel ParseLevel(const std::string& s)
     if (s == "Warn"  || s == "2") return LogLevel::Warn;
     if (s == "Debug" || s == "4") return LogLevel::Debug;
     if (s == "Trace" || s == "5") return LogLevel::Trace;
-    return LogLevel::Info; // default
+    return LogLevel::Info;
 }
 
 } // namespace Log
