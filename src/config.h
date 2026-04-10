@@ -29,7 +29,11 @@ struct Config {
     // [Debug]
     bool        dumpShaders    = false;
     std::string dumpDir        = "ShaderDump";
-    bool        logShaderHash  = true;
+    bool        logShaderHash    = true;
+    // Enable D3D12 SDK debug layer before device creation
+    bool        enableDebugLayer = false;
+    // Drain ID3D12InfoQueue messages into the 3DV12 log at each intercept point
+    bool        drainInfoQueue   = true;
 };
 
 // ---------------------------------------------------------------------------
