@@ -310,7 +310,7 @@ HRESULT WrappedDevice::CreateRootSignature(
 HRESULT WrappedDevice::CreateCommandList(
     UINT nodeMask, D3D12_COMMAND_LIST_TYPE type,
     ID3D12CommandAllocator* pAlloc, ID3D12PipelineState* pPSO,
-    REFIID riid, void** ppCmdList)
+    [[maybe_unused]] REFIID riid, void** ppCmdList)
 {
     HRESULT hr = m_pReal->CreateCommandList(nodeMask, type, pAlloc, pPSO,
                                              IID_PPV_ARGS((ID3D12GraphicsCommandList**)ppCmdList));

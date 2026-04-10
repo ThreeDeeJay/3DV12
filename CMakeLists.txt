@@ -72,6 +72,7 @@ target_compile_options(3DV12 PRIVATE
 target_link_libraries(3DV12 PRIVATE
     d3d12.lib
     dxgi.lib
+    dxguid.lib      # IID_ID3D12ShaderReflection and other D3D GUIDs
     d3dcompiler.lib
     "$<$<BOOL:${NVAPI_SDK_DIR}>:${NVAPI_SDK_DIR}/amd64/nvapi64.lib>"
 )

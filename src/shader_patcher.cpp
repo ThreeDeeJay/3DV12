@@ -8,10 +8,7 @@
 #include <Windows.h>
 #include <d3dcompiler.h>
 #include <cstring>
-#include <sstream>
-#include <iomanip>
-#include <fstream>
-#include <filesystem>
+#include <cstdio>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -207,15 +204,22 @@ void DumpIfEnabled(const void* pBytecode, size_t byteLen,
                    const ShaderInfo& info, const char* suffix)
 {
     if (!Cfg::g.dumpShaders) return;
-    try {
-        std::filesystem::create_directories(Cfg::g.dumpDir);
-        std::ostringstream name;
-        name << Cfg::g.dumpDir << "/"
-             << std::hex << std::uppercase << std::setfill('0') << std::setw(16)
-             << info.hash << "_" << suffix << ".bin";
-        std::ofstream f(name.str(), std::ios::binary);
-        if (f.is_open()) f.write((const char*)pBytecode, byteLen);
-    } catch (...) {}
+
+    // Use Win32 directly to avoid std::filesystem::path's internal wchar_t
+    // widening/narrowing which triggers C4244 on MSVC.
+    CreateDirectoryA(Cfg::g.dumpDir.c_str(), nullptr);
+
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s\\%016llX_%s.bin",
+                Cfg::g.dumpDir.c_str(),
+                static_cast<unsigned long long>(info.hash), suffix);
+
+    HANDLE h = CreateFileA(path, GENERIC_WRITE, 0, nullptr,
+                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    DWORD written = 0;
+    WriteFile(h, pBytecode, static_cast<DWORD>(byteLen), &written, nullptr);
+    CloseHandle(h);
 }
 
 // ---------------------------------------------------------------------------
