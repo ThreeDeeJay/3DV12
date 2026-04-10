@@ -13,6 +13,7 @@
 
 // g_hRealD3D12 is set in dllmain.cpp and used for RS (de)serialisation.
 extern HMODULE g_hRealD3D12;
+extern void DrainInfoQueue(ID3D12Device* pDevice);
 
 using PFN_D3D12SerializeVersionedRS   = HRESULT(WINAPI*)(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC*, ID3DBlob**, ID3DBlob**);
 using PFN_D3D12DeserializeVersionedRS = HRESULT(WINAPI*)(const void*, SIZE_T, ID3D12VersionedRootSignatureDeserializer**, const D3D12_VERSIONED_ROOT_SIGNATURE_DESC**);
@@ -253,36 +254,56 @@ LUID    WrappedDevice::GetAdapterLuid()                                         
 HRESULT WrappedDevice::CreateGraphicsPipelineState(
     const D3D12_GRAPHICS_PIPELINE_STATE_DESC* pDesc, REFIID riid, void** ppPSO)
 {
-    if (!Cfg::g.stereoEnabled || !pDesc)
-        return m_pReal->CreateGraphicsPipelineState(pDesc, riid, ppPSO);
+    LOG_DEBUG("CreateGraphicsPSO: entry pDesc=%p", (void*)pDesc);
+    if (!Cfg::g.stereoEnabled || !pDesc) {
+        HRESULT hr = m_pReal->CreateGraphicsPipelineState(pDesc, riid, ppPSO);
+        LOG_DEBUG("CreateGraphicsPSO: pass-through hr=0x%08X", (unsigned)hr);
+        DrainInfoQueue(m_pReal);
+        return hr;
+    }
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = *pDesc;
     ShaderPatcher::PatchedPSO storage;
     bool patched = ShaderPatcher::PatchGraphicsPSO(desc, storage,
                                                     (uint32_t)Cfg::g.stereoConstantBuffer);
-    if (patched) LOG_DEBUG("CreateGraphicsPSO: shader(s) patched.");
-    return m_pReal->CreateGraphicsPipelineState(&desc, riid, ppPSO);
+    LOG_DEBUG("CreateGraphicsPSO: patched=%d calling real...", (int)patched);
+    HRESULT hr = m_pReal->CreateGraphicsPipelineState(&desc, riid, ppPSO);
+    LOG_DEBUG("CreateGraphicsPSO: hr=0x%08X", (unsigned)hr);
+    DrainInfoQueue(m_pReal);
+    return hr;
 }
 
 HRESULT WrappedDevice::CreateComputePipelineState(
     const D3D12_COMPUTE_PIPELINE_STATE_DESC* pDesc, REFIID riid, void** ppPSO)
 {
-    if (!Cfg::g.stereoEnabled || !pDesc)
-        return m_pReal->CreateComputePipelineState(pDesc, riid, ppPSO);
+    LOG_DEBUG("CreateComputePSO: entry pDesc=%p", (void*)pDesc);
+    if (!Cfg::g.stereoEnabled || !pDesc) {
+        HRESULT hr = m_pReal->CreateComputePipelineState(pDesc, riid, ppPSO);
+        LOG_DEBUG("CreateComputePSO: pass-through hr=0x%08X", (unsigned)hr);
+        DrainInfoQueue(m_pReal);
+        return hr;
+    }
 
     D3D12_COMPUTE_PIPELINE_STATE_DESC desc = *pDesc;
     ShaderPatcher::PatchedCSPSO storage;
     bool patched = ShaderPatcher::PatchComputePSO(desc, storage,
                                                    (uint32_t)Cfg::g.stereoConstantBuffer);
-    if (patched) LOG_DEBUG("CreateComputePSO: shader patched.");
-    return m_pReal->CreateComputePipelineState(&desc, riid, ppPSO);
+    LOG_DEBUG("CreateComputePSO: patched=%d calling real...", (int)patched);
+    HRESULT hr = m_pReal->CreateComputePipelineState(&desc, riid, ppPSO);
+    LOG_DEBUG("CreateComputePSO: hr=0x%08X", (unsigned)hr);
+    DrainInfoQueue(m_pReal);
+    return hr;
 }
 
 HRESULT WrappedDevice::CreateRootSignature(
     UINT nodeMask, const void* pBlob, SIZE_T blobLen, REFIID riid, void** ppRS)
 {
-    if (!Cfg::g.stereoEnabled)
-        return m_pReal->CreateRootSignature(nodeMask, pBlob, blobLen, riid, ppRS);
+    LOG_DEBUG("CreateRootSignature: entry nodeMask=%u blobLen=%zu", nodeMask, blobLen);
+    if (!Cfg::g.stereoEnabled) {
+        HRESULT hr = m_pReal->CreateRootSignature(nodeMask, pBlob, blobLen, riid, ppRS);
+        LOG_DEBUG("CreateRootSignature: pass-through hr=0x%08X", (unsigned)hr);
+        return hr;
+    }
 
     UINT stereoIdx = 0;
     ID3DBlob* pNew = AppendStereoParam(pBlob, blobLen,
@@ -290,6 +311,8 @@ HRESULT WrappedDevice::CreateRootSignature(
                                         stereoIdx);
     HRESULT hr;
     if (pNew) {
+        LOG_DEBUG("CreateRootSignature: stereo blob built (%zu bytes), calling real...",
+                  pNew->GetBufferSize());
         hr = m_pReal->CreateRootSignature(nodeMask,
                                           pNew->GetBufferPointer(),
                                           pNew->GetBufferSize(), riid, ppRS);
@@ -297,12 +320,17 @@ HRESULT WrappedDevice::CreateRootSignature(
             RSMeta meta{};
             meta.stereoParamIdx = stereoIdx;
             TrackRSMeta(static_cast<ID3D12RootSignature*>(*ppRS), meta);
-            LOG_DEBUG("CreateRootSignature: stereo param appended at slot %u", stereoIdx);
+            LOG_DEBUG("CreateRootSignature: stereo param appended at slot %u hr=0x%08X",
+                      stereoIdx, (unsigned)hr);
+        } else {
+            LOG_ERROR("CreateRootSignature: real CreateRootSignature FAILED hr=0x%08X", (unsigned)hr);
+            DrainInfoQueue(m_pReal);
         }
         pNew->Release();
     } else {
-        LOG_WARN("CreateRootSignature: could not append stereo param – using original.");
+        LOG_WARN("CreateRootSignature: AppendStereoParam failed – using original blob.");
         hr = m_pReal->CreateRootSignature(nodeMask, pBlob, blobLen, riid, ppRS);
+        LOG_DEBUG("CreateRootSignature: fallback hr=0x%08X", (unsigned)hr);
     }
     return hr;
 }
@@ -312,8 +340,10 @@ HRESULT WrappedDevice::CreateCommandList(
     ID3D12CommandAllocator* pAlloc, ID3D12PipelineState* pPSO,
     [[maybe_unused]] REFIID riid, void** ppCmdList)
 {
+    LOG_DEBUG("CreateCommandList: entry type=%d", (int)type);
     HRESULT hr = m_pReal->CreateCommandList(nodeMask, type, pAlloc, pPSO,
                                              IID_PPV_ARGS((ID3D12GraphicsCommandList**)ppCmdList));
+    LOG_DEBUG("CreateCommandList: real hr=0x%08X", (unsigned)hr);
     if (SUCCEEDED(hr)) WrapCommandList(ppCmdList);
     return hr;
 }
