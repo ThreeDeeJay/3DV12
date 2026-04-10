@@ -5,7 +5,7 @@ env:
   GH_TOKEN: ${{github.token}}
   Branch: ${{github.ref_name}}
   Artifacts: build/Release
-  Extension: *.dll # *
+  Extension: *.dll
   Title: ${{github.event.repository.name}}
 
 on:
