@@ -67,9 +67,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{env.Title}}-${{matrix.Settings.Name}}-${{matrix.Configuration}}
-        path: |
-          "${{github.workspace}}/${{env.Artifacts}}/${{env.Extension}}"
-          "${{github.workspace}}/build/*.def"
+        path: "${{github.workspace}}/${{env.Artifacts}}/${{env.Extension}}"
 
   Release:
     name: Release
