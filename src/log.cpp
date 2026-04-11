@@ -38,9 +38,8 @@ void Init(const std::string& filePath, LogLevel level)
 
     fprintf(g_File,
             "========================================\n"
-            PROJECT_FULL " – version int %d\n"
-            "========================================\n",
-            VERSION);
+            PROJECT_FULL "\n"
+            "========================================\n");
     fflush(g_File);
 }
 

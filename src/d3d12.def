@@ -1,12 +1,15 @@
 ; 3DV12 – Direct3D 12 stereoscopic shader-patching wrapper
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ;
-; Exported functions matching the real d3d12.dll interface.
-; This file is used by both x64 and x86 builds.
+; Every symbol exported by the real d3d12.dll must appear here.
+; Anything missing will be NULL when DXGI or other system DLLs do
+;   GetProcAddress(GetModuleHandle("d3d12.dll"), "<name>")
+; which they do for OpenAdapter12, the Agility SDK bootstrap, PIX, etc.
 
 LIBRARY "d3d12"
 
 EXPORTS
+    ; ---- Core public API ----
     D3D12CreateDevice
     D3D12GetDebugInterface
     D3D12CreateRootSignatureDeserializer
@@ -15,3 +18,18 @@ EXPORTS
     D3D12CreateVersionedRootSignatureDeserializer
     D3D12EnableExperimentalFeatures
     D3D12GetInterface
+
+    ; ---- WDDM / DXGI DDI (called by dxgi.dll via GetProcAddress) ----
+    OpenAdapter12
+    SetAppCompatStringPointer
+
+    ; ---- DirectX Agility SDK bootstrap ----
+    D3D12CoreCreateLayeredDevice
+    D3D12CoreGetLayeredDeviceSize
+    D3D12CoreRegisterDestroyedObject
+
+    ; ---- PIX performance / event API ----
+    D3D12PIXEventsReplaceBlock
+    D3D12PIXGetThreadInfo
+    D3D12PIXNotifyWakeFromFenceSignal
+    D3D12PIXReportCounter
