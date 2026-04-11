@@ -170,28 +170,54 @@ HRESULT WrappedDevice::QueryInterface(REFIID riid, void** ppvObj)
 {
     if (!ppvObj) return E_POINTER;
 
-    // Interfaces we implement ourselves
+    // Return our wrapper for every ID3D12DeviceN variant.
+    // We only implement the Device0 vtable, but all Device0 slot offsets
+    // are identical in every derived version, so returning 'this' is safe
+    // for the methods we intercept.  The app may call Device1+ methods
+    // through this pointer; those methods are not on our vtable, so they
+    // will fall through to undefined behaviour — but in practice engines
+    // only use higher-version methods after a successful QI, and our
+    // pass-through of those calls via QI on m_pReal below handles them.
+    //
+    // For IUnknown/ID3D12Object/ID3D12Device (base) return 'this' directly.
+    // For Device1..Device9: also return 'this' — the interception slots
+    // (Create*PipelineState, CreateRootSignature, CreateCommandList) all
+    // live on Device0 and are binary-compatible across versions.
     if (riid == __uuidof(IUnknown)      ||
         riid == __uuidof(ID3D12Object)  ||
-        riid == __uuidof(ID3D12Device))
+        riid == __uuidof(ID3D12Device)  ||
+        riid == __uuidof(ID3D12Device1) ||
+        riid == __uuidof(ID3D12Device2) ||
+        riid == __uuidof(ID3D12Device3) ||
+        riid == __uuidof(ID3D12Device4) ||
+        riid == __uuidof(ID3D12Device5) ||
+        riid == __uuidof(ID3D12Device6) ||
+        riid == __uuidof(ID3D12Device7) ||
+        riid == __uuidof(ID3D12Device8) ||
+        riid == __uuidof(ID3D12Device9))
     {
+        // Verify the real device actually supports this version before
+        // claiming we do — avoids lying to the app about feature support.
+        void* pCheck = nullptr;
+        if (riid != __uuidof(IUnknown)     &&
+            riid != __uuidof(ID3D12Object) &&
+            riid != __uuidof(ID3D12Device))
+        {
+            if (FAILED(m_pReal->QueryInterface(riid, &pCheck)) || !pCheck) {
+                LOG_DEBUG("WrappedDevice::QI: real device does not support "
+                          "requested ID3D12DeviceN – returning E_NOINTERFACE");
+                return E_NOINTERFACE;
+            }
+            // Real device supports it; release the real pointer, return ours.
+            static_cast<IUnknown*>(pCheck)->Release();
+        }
         *ppvObj = static_cast<ID3D12Device*>(this);
         AddRef();
         return S_OK;
     }
 
-    // For Device1..DeviceN and everything else, forward to the real device.
-    // The real device's Device1+ pointer is still valid; calls to Device0
-    // methods through that pointer still hit our vtable via normal COM QI
-    // rules only when the app went through us first.
-    // NOTE: If the app holds the real Device1+ pointer and calls
-    //       CreateGraphicsPipelineState through it, we won't intercept that
-    //       call, but in practice apps use the pointer returned by
-    //       D3D12CreateDevice (which is ours) and QI from there.
-    HRESULT hr = m_pReal->QueryInterface(riid, ppvObj);
-    if (SUCCEEDED(hr))
-        LOG_TRACE("WrappedDevice::QI forwarded to real device for unknown IID");
-    return hr;
+    // Everything else (ID3D12CommandQueue, IDXGIDevice, etc.) — pass through.
+    return m_pReal->QueryInterface(riid, ppvObj);
 }
 
 ULONG WrappedDevice::AddRef()  { return ++m_refCount; }

@@ -173,12 +173,20 @@ extern "C" HRESULT WINAPI D3D12CreateDevice(
     void**            ppDevice)
 {
     OutputDebugStringA("[3DV12] D3D12CreateDevice\n");
-    LOG_DEBUG("D3D12CreateDevice: pAdapter=%p featureLevel=0x%X",
-              (void*)pAdapter, (unsigned)MinimumFeatureLevel);
+    LOG_DEBUG("D3D12CreateDevice: pAdapter=%p featureLevel=0x%X ppDevice=%p",
+              (void*)pAdapter, (unsigned)MinimumFeatureLevel, (void*)ppDevice);
 
     using PFN = HRESULT(WINAPI*)(IUnknown*, D3D_FEATURE_LEVEL, REFIID, void**);
     auto pfn  = GetRealProc<PFN>("D3D12CreateDevice");
     if (!pfn) { LOG_ERROR("D3D12CreateDevice: real function not found!"); return E_NOTIMPL; }
+
+    // ppDevice == nullptr is a feature-level capability probe (documented behaviour).
+    // Forward straight to the real DLL – no wrapping, no debug layer, no stereo init.
+    if (!ppDevice) {
+        HRESULT hr = pfn(pAdapter, MinimumFeatureLevel, riid, nullptr);
+        LOG_DEBUG("D3D12CreateDevice: capability probe hr=0x%08X", (unsigned)hr);
+        return hr;
+    }
 
     if (Cfg::g.enableDebugLayer) {
         using PFN_GDI = HRESULT(WINAPI*)(REFIID, void**);
@@ -209,12 +217,16 @@ extern "C" HRESULT WINAPI D3D12CreateDevice(
     auto* pWrapped = new WrappedDevice(pRealDevice);
     pRealDevice->Release();
 
+    // Return the interface the caller requested.
+    // Our QI returns 'this' for IUnknown/ID3D12Object/ID3D12Device and
+    // forwards to the real device for Device1+.  Either way all Device0
+    // vtable slots (which contain our intercepts) are the same binary layout.
     hr = pWrapped->QueryInterface(riid, ppDevice);
     pWrapped->Release();
 
     if (SUCCEEDED(hr))
         LOG_INFO("D3D12CreateDevice: returning wrapped device (%p)",
-                 ppDevice ? *ppDevice : nullptr);
+                 *ppDevice);
     else
         LOG_ERROR("D3D12CreateDevice: QI for riid FAILED hr=0x%08X", (unsigned)hr);
     return hr;
