@@ -5,7 +5,7 @@
 
 // Increment this integer for every release.
 // It appears in log headers and compiled artifacts.
-#define VERSION        8
-#define VERSION_STRING "8"
+#define VERSION        9
+#define VERSION_STRING "9"
 #define PROJECT_NAME   "3DV12"
 #define PROJECT_FULL   "3DV12 v" VERSION_STRING " – D3D12 Stereo Shader Patcher"

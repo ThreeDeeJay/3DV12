@@ -5,7 +5,7 @@ env:
   GH_TOKEN: "${{github.token}}"
   Branch: "${{github.ref_name}}"
   Artifacts: "build/Release"
-  Extension: "*.dll"
+  Extension: "*"
   Title: "${{github.event.repository.name}}"
 
 on:
@@ -103,6 +103,7 @@ jobs:
         run: |
           cp "README.md" "Release/ReadMe.txt"
           cp "LICENSE" "Release/License.txt"
+          cp "scripts/gen_def.py" "Release/gen_def.py"
   
       - name: Compress artifacts
         run: |
